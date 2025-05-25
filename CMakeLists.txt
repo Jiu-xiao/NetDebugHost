@@ -1,0 +1,27 @@
+cmake_minimum_required(VERSION 3.14)
+project(NetDebugHost)
+
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
+# 设置输出目录（可执行文件、静态库、动态库等）
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
+
+# 子目录
+add_subdirectory(libxr)
+add_subdirectory(Modules)
+
+add_executable(${PROJECT_NAME} User/main.cpp)
+
+target_link_libraries(
+    ${PROJECT_NAME}
+    PUBLIC xr
+)
+
+target_include_directories(
+    ${PROJECT_NAME}
+    PUBLIC $<TARGET_PROPERTY:xr,INTERFACE_INCLUDE_DIRECTORIES>
+    PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/User
+)
+
+find_library(WPA_CLIENT_LIB wpa_client REQUIRED)
