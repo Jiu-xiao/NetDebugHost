@@ -2,6 +2,7 @@
 #include "libxr.hpp"
 
 // Module headers
+#include "NetDebugHost.hpp"
 #include "BlinkLED.hpp"
 
 static void XRobotMain(LibXR::HardwareContainer &hw) {
@@ -9,7 +10,7 @@ static void XRobotMain(LibXR::HardwareContainer &hw) {
   ApplicationManager appmgr;
 
   // Auto-generated module instantiations
-  static BlinkLED blinkled(hw, appmgr, 250);
+  static NetDebugHost netdebughost(hw, appmgr);
 
   while (true) {
     appmgr.MonitorAll();

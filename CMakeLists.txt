@@ -25,3 +25,11 @@ target_include_directories(
 )
 
 find_library(WPA_CLIENT_LIB wpa_client REQUIRED)
+
+find_package(PkgConfig REQUIRED)
+pkg_check_modules(LIBUDEV REQUIRED libudev)
+
+target_include_directories(${PROJECT_NAME} PRIVATE ${LIBUDEV_INCLUDE_DIRS})
+target_link_libraries(${PROJECT_NAME} PRIVATE ${LIBUDEV_LIBRARIES})
+
+include(Modules/CMakeLists.txt)

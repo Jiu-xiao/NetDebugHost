@@ -1,6 +1,5 @@
 global_settings:
   monitor_sleep_ms: 1000
 modules:
-- name: BlinkLED
-  constructor_args:
-    blink_cycle: 250
+- name: NetDebugHost
+  constructor_args: {}
