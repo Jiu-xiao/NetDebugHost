@@ -15,8 +15,6 @@
 #include <termios.h>
 #include <unistd.h>
 
-#include <csignal>
-
 static pid_t pid;
 
 using namespace LibXR;
@@ -65,31 +63,46 @@ void NetDebugHost::SpawnShell() {
 }
 
 void NetDebugHost::ShellReadThread(NetDebugHost *self) {
-  uint8_t buf[4096];
-  uint8_t pack_buffer[4096 + LibXR::Topic::PACK_BASE_SIZE];
+  uint8_t buf[40960];
+  uint8_t pack_buffer[40960 + LibXR::Topic::PACK_BASE_SIZE];
   LibXR::Semaphore sem;
   LibXR::WriteOperation op(sem);
+
+  int fd = self->shell_stdout_fd_;
+
   while (true) {
-    ssize_t n = read(self->shell_stdout_fd_, buf,
-                     sizeof(buf)); // shell stdout -> 串口
-    if (n > 0) {
-      LibXR::Topic::PackData(
-          LibXR::Topic::TopicHandle(self->uart_topic_)->data_.crc32,
-          pack_buffer, LibXR::RawData{buf, (size_t)n});
-      self->uart_->Write(
-          {pack_buffer, (size_t)n + LibXR::Topic::PACK_BASE_SIZE}, op);
-    } else {
+    fd_set read_fds;
+    FD_ZERO(&read_fds);
+    FD_SET(fd, &read_fds);
+
+    // 等待最多 1 秒（可选）
+    struct timeval timeout;
+    timeout.tv_sec = 10;
+    timeout.tv_usec = 0;
+
+    int ret = select(fd + 1, &read_fds, nullptr, nullptr, &timeout);
+    if (ret > 0 && FD_ISSET(fd, &read_fds)) {
+      ssize_t n = read(fd, buf, sizeof(buf));
+      if (n > 0) {
+        LibXR::Topic::PackData(
+            LibXR::Topic::TopicHandle(self->uart_topic_)->data_.crc32,
+            pack_buffer, LibXR::RawData{buf, (size_t)n});
+        self->uart_->Write(
+            {pack_buffer, (size_t)n + LibXR::Topic::PACK_BASE_SIZE}, op);
+      }
+    } else if (ret < 0) {
+      XR_LOG_ERROR("select failed: %s", strerror(errno));
       LibXR::Thread::Sleep(1);
     }
   }
 }
 
 void NetDebugHost::ShellWriteThread(NetDebugHost *self) {
-  uint8_t buf[4096];
+  uint8_t buf[40960];
   LibXR::Semaphore sem;
   LibXR::ReadOperation op(sem);
   LibXR::RawData read_buffer(buf);
-  LibXR::Topic::Server server(4096);
+  LibXR::Topic::Server server(40960);
   server.Register(self->uart_topic_);
   server.Register(self->wifi_config_topic_);
   server.Register(self->command_topic_);
@@ -103,12 +116,15 @@ void NetDebugHost::ShellWriteThread(NetDebugHost *self) {
   self->uart_topic_.RegisterCallback(shell_write_cb);
 
   while (true) {
-    read_buffer.size_ = LibXR::min(sizeof(buf), self->uart_->read_port_->Size());
-     self->uart_->Read(read_buffer, op);
+    read_buffer.size_ =
+        LibXR::min(sizeof(buf), self->uart_->read_port_->Size());
+    self->uart_->Read(read_buffer, op);
     if (read_buffer.size_ == 0) {
       continue;
     }
-    XR_LOG_INFO("Read %d bytes", read_buffer.size_);
+    buf[read_buffer.size_] = 0;
+    XR_LOG_DEBUG("Read %d bytes: %s", read_buffer.size_,
+                 (char *)read_buffer.addr_);
     server.ParseData({buf, (size_t)read_buffer.size_});
   }
 }

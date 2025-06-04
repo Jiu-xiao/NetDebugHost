@@ -26,12 +26,13 @@ public:
   };
 
   NetDebugHost(LibXR::HardwareContainer &hw, LibXR::ApplicationManager &app)
-      : uart_topic_("uart_cdc", 4096),
+      : uart_topic_("uart_cdc", 40960),
         wifi_config_topic_("wifi_config", sizeof(LibXR::WifiClient::Config)),
         command_topic_("command", sizeof(Command)) {
     uart_ = hw.template FindOrExit<LibXR::UART>({"uart_cdc"});
     wifi_client_ = hw.template FindOrExit<LibXR::WifiClient>({"wifi_client"});
-    power_manager_ = hw.template FindOrExit<LibXR::PowerManager>({"power_manager"});
+    power_manager_ =
+        hw.template FindOrExit<LibXR::PowerManager>({"power_manager"});
 
     wifi_client_->Enable();
 
@@ -76,7 +77,7 @@ public:
             XR_LOG_DEBUG("Ping");
             break;
           case Command::REBOOT:
-            XR_LOG_DEBUG("Rebooting...");
+            XR_LOG_INFO("Rebooting...");
             self->power_manager_->Reset();
             break;
           }
