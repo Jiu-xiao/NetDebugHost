@@ -18,21 +18,32 @@ required_hardware: uart_cdc wifi_client
 #include "thread.hpp"
 #include "uart.hpp"
 
-class NetDebugHost : public LibXR::Application
-{
+class NetDebugHost : public LibXR::Application {
 public:
-  enum class Command : uint8_t
-  {
-    PING = 0,
-    REMOTE_PING,
-    REBOOT = 1
+  class Command {
+  public:
+    enum class Type : uint8_t {
+      PING = 0,
+      REMOTE_PING = 1,
+      REBOOT = 2,
+      RENAME = 3,
+      CONFIG_UART = 4,
+    };
+
+    Type type;
+    union {
+      char device_name[32];
+      struct {
+        uint8_t uart_index;
+        LibXR::UART::Configuration uart_config;
+      } uart_config;
+    } data;
   };
 
   NetDebugHost(LibXR::HardwareContainer &hw, LibXR::ApplicationManager &app)
       : uart_topic_("uart_cdc", 40960),
         wifi_config_topic_("wifi_config", sizeof(LibXR::WifiClient::Config)),
-        command_topic_("command", sizeof(Command))
-  {
+        command_topic_("command", sizeof(Command)) {
     uart_ = hw.template FindOrExit<LibXR::UART>({"uart_cdc"});
     wifi_client_ = hw.template FindOrExit<LibXR::WifiClient>({"wifi_client"});
     power_manager_ =
@@ -40,12 +51,9 @@ public:
 
     wifi_client_->Enable();
 
-    if (wifi_client_->IsConnected())
-    {
+    if (wifi_client_->IsConnected()) {
       XR_LOG_INFO("Wifi connected");
-    }
-    else
-    {
+    } else {
       XR_LOG_INFO("Wifi not connected");
     }
 
@@ -53,8 +61,7 @@ public:
 
     void (*wifi_config_cb_fun)(bool in_isr, NetDebugHost *,
                                LibXR::RawData &) = [](bool, NetDebugHost *self,
-                                                      LibXR::RawData &data)
-    {
+                                                      LibXR::RawData &data) {
       LibXR::WifiClient::Config *config =
           (LibXR::WifiClient::Config *)data.addr_;
       XR_LOG_INFO("Wifi config: SSID: %s, Password: %s", config->ssid,
@@ -78,28 +85,27 @@ public:
                                 512, LibXR::Thread::Priority::MEDIUM);
 
     void (*command_cb_fun)(bool in_isr, NetDebugHost *, LibXR::RawData &) =
-        [](bool, NetDebugHost *self, LibXR::RawData &data)
-    {
-      Command *cmd = (Command *)data.addr_;
-      switch (*cmd)
-      {
-      case Command::PING:
-      {
-        static LibXR::Topic::PackedData<Command> buf;
-        static LibXR::WriteOperation op(self->uart_write_sem_, 10);
-        LibXR::Topic::PackData(
-            LibXR::Topic::TopicHandle(self->command_topic_)->data_.crc32,
-            buf, Command::REMOTE_PING);
-        self->uart_->Write(buf, op);
-        XR_LOG_DEBUG("Ping");
-        break;
-      }
-      case Command::REBOOT:
-        XR_LOG_INFO("Rebooting...");
-        self->power_manager_->Reset();
-        break;
-      }
-    };
+        [](bool, NetDebugHost *self, LibXR::RawData &data) {
+          Command *cmd = (Command *)data.addr_;
+          switch (cmd->type) {
+          case Command::Type::PING: {
+            static LibXR::Topic::PackedData<Command> buf;
+            static LibXR::WriteOperation op(self->uart_write_sem_, 10);
+            LibXR::Topic::PackData(
+                LibXR::Topic::TopicHandle(self->command_topic_)->data_.crc32,
+                buf, Command::Type::REMOTE_PING);
+            self->uart_->Write(buf, op);
+            XR_LOG_DEBUG("Ping");
+            break;
+          }
+          case Command::Type::REBOOT:
+            XR_LOG_INFO("Rebooting...");
+            self->power_manager_->Reset();
+            break;
+          default:
+            break;
+          }
+        };
 
     auto command_cb = LibXR::Topic::Callback::Create(command_cb_fun, this);
 
@@ -116,20 +122,14 @@ public:
 
   static void ShellWriteThread(NetDebugHost *self);
 
-  static void WifiConnectThread(NetDebugHost *self)
-  {
-    while (true)
-    {
-      if (self->wifi_connect_sem_.Wait() == ErrorCode::OK)
-      {
+  static void WifiConnectThread(NetDebugHost *self) {
+    while (true) {
+      if (self->wifi_connect_sem_.Wait() == ErrorCode::OK) {
         XR_LOG_INFO("Start wifi connect...");
         auto ans = self->wifi_client_->Connect(self->wifi_config_);
-        if (ans == LibXR::WifiClient::WifiError::NONE)
-        {
+        if (ans == LibXR::WifiClient::WifiError::NONE) {
           XR_LOG_INFO("Wifi connected");
-        }
-        else
-        {
+        } else {
           XR_LOG_INFO("Wifi connect failed");
         }
       }
