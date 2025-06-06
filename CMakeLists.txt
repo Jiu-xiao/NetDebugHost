@@ -8,7 +8,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 
 # 子目录
-set(LIBXR_LOG_LEVEL 3)
+set(LIBXR_LOG_LEVEL 0)
 add_subdirectory(libxr)
 add_subdirectory(Modules)
 

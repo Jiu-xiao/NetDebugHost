@@ -23,23 +23,42 @@ static constexpr const char *SHELL_PATH = "/bin/bash";
 
 void KillShell() { kill(pid, SIGKILL); }
 
-void NetDebugHost::SpawnShell() {
-  void (*daemon_thread_fun)(NetDebugHost *) = [](NetDebugHost *self) {
-    while (true) {
+void NetDebugHost::SpawnShell()
+{
+  void (*daemon_thread_fun)(NetDebugHost *) = [](NetDebugHost *self)
+  {
+    while (true)
+    {
       static bool inited = false;
-      if (!inited) {
+      if (!inited)
+      {
         inited = true;
-      } else {
+      }
+      else
+      {
         int status = 0;
         waitpid(pid, &status, 0);
         XR_LOG_INFO("Shell exited with status %d", status);
+        close(self->shell_stdout_fd_);
       }
       int pty_fd;
       int pty_master_fd;
       pid_t shell_pid;
       pid = forkpty(&pty_fd, nullptr, nullptr, nullptr);
-      if (pid == 0) {
-        execl(SHELL_PATH, "bash", "-c", "cd $HOME; exec bash", nullptr);
+      if (pid == 0)
+      {
+        // 在子进程中设置 TERM 环境变量并启动 bash
+        const char *term_value = "xterm-256color"; // 设置 TERM 为 xterm-256color
+        setenv("TERM", term_value, 1);             // 设置环境变量
+
+        // 设置启动命令，启动 bash，并执行 cd $HOME; exec bash
+        const char *shell_path = "/bin/bash";
+        const char *argv[] = {shell_path, "-c", "cd $HOME; exec bash", nullptr};
+
+        // 使用 execve 启动 shell，传递 TERM 环境变量
+        execve(shell_path, (char *const *)argv, environ);
+
+        // 如果 execve 失败，则退出子进程
         _exit(1);
       }
 
@@ -61,8 +80,8 @@ void NetDebugHost::SpawnShell() {
 
   shell_sem_.Wait();
 }
-
-void NetDebugHost::ShellReadThread(NetDebugHost *self) {
+void NetDebugHost::ShellReadThread(NetDebugHost *self)
+{
   uint8_t buf[40960];
   uint8_t pack_buffer[40960 + LibXR::Topic::PACK_BASE_SIZE];
   LibXR::Semaphore sem;
@@ -70,7 +89,8 @@ void NetDebugHost::ShellReadThread(NetDebugHost *self) {
 
   int fd = self->shell_stdout_fd_;
 
-  while (true) {
+  while (true)
+  {
     fd_set read_fds;
     FD_ZERO(&read_fds);
     FD_SET(fd, &read_fds);
@@ -81,23 +101,28 @@ void NetDebugHost::ShellReadThread(NetDebugHost *self) {
     timeout.tv_usec = 0;
 
     int ret = select(fd + 1, &read_fds, nullptr, nullptr, &timeout);
-    if (ret > 0 && FD_ISSET(fd, &read_fds)) {
+    if (ret > 0 && FD_ISSET(fd, &read_fds))
+    {
       ssize_t n = read(fd, buf, sizeof(buf));
-      if (n > 0) {
+      if (n > 0)
+      {
         LibXR::Topic::PackData(
             LibXR::Topic::TopicHandle(self->uart_topic_)->data_.crc32,
             pack_buffer, LibXR::RawData{buf, (size_t)n});
         self->uart_->Write(
             {pack_buffer, (size_t)n + LibXR::Topic::PACK_BASE_SIZE}, op);
       }
-    } else if (ret < 0) {
+    }
+    else if (ret < 0)
+    {
       XR_LOG_ERROR("select failed: %s", strerror(errno));
       LibXR::Thread::Sleep(1);
     }
   }
 }
 
-void NetDebugHost::ShellWriteThread(NetDebugHost *self) {
+void NetDebugHost::ShellWriteThread(NetDebugHost *self)
+{
   uint8_t buf[40960];
   LibXR::Semaphore sem;
   LibXR::ReadOperation op(sem);
@@ -107,19 +132,22 @@ void NetDebugHost::ShellWriteThread(NetDebugHost *self) {
   server.Register(self->wifi_config_topic_);
   server.Register(self->command_topic_);
   void (*shell_write_cb_fun)(bool in_isr, NetDebugHost *, RawData &) =
-      [](bool, NetDebugHost *self, LibXR::RawData &data) {
-        write(self->shell_stdin_fd_, data.addr_, data.size_);
-      };
+      [](bool, NetDebugHost *self, LibXR::RawData &data)
+  {
+    write(self->shell_stdin_fd_, data.addr_, data.size_);
+  };
   auto shell_write_cb =
       LibXR::Topic::Callback::Create(shell_write_cb_fun, self);
 
   self->uart_topic_.RegisterCallback(shell_write_cb);
 
-  while (true) {
+  while (true)
+  {
     read_buffer.size_ =
         LibXR::min(sizeof(buf), self->uart_->read_port_->Size());
     self->uart_->Read(read_buffer, op);
-    if (read_buffer.size_ == 0) {
+    if (read_buffer.size_ == 0)
+    {
       continue;
     }
     buf[read_buffer.size_] = 0;
