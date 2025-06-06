@@ -14,7 +14,9 @@ DEB_DIR="${APP_NAME}_${VERSION}_${ARCH}"
 echo "[*] Packaging $APP_NAME version $VERSION for $ARCH..."
 
 # 1. 清理并创建目录结构
-rm -rf "$DEB_DIR"
+if [ -d "$DEB_DIR" ]; then
+    rm -rf "$DEB_DIR"
+fi
 mkdir -p "$DEB_DIR/usr/bin"
 mkdir -p "$DEB_DIR/lib/systemd/system"
 mkdir -p "$DEB_DIR/DEBIAN"
@@ -46,6 +48,11 @@ After=network.target
 ExecStart=/usr/bin/${APP_NAME}
 Restart=always
 RestartSec=3
+Environment="PATH=/usr/local/bin:/usr/bin:/bin"
+Environment="LD_LIBRARY_PATH=/usr/local/lib:/usr/lib"
+StandardInput=tty
+StandardOutput=append:/var/log/netdebughost.log
+StandardError=append:/var/log/netdebughost.log
 
 [Install]
 WantedBy=multi-user.target
@@ -56,8 +63,8 @@ cat >"$DEB_DIR/DEBIAN/postinst" <<EOF
 #!/bin/bash
 set -e
 systemctl daemon-reload
-systemctl enable ${SERVICE_NAME}.service
-systemctl start ${SERVICE_NAME}.service
+systemctl enable ${SERVICE_NAME}.service || true
+systemctl start ${SERVICE_NAME}.service || true
 echo "${APP_NAME} installed and service started."
 EOF
 chmod +x "$DEB_DIR/DEBIAN/postinst"
