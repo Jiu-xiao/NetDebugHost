@@ -37,6 +37,7 @@ jobs:
           pip install --upgrade pip
           pip install xrobot
           xrobot_setup
+          git clone https://github.com/Jiu-xiao/libxr.git
 
       - name: Configure and build project
         run: |
