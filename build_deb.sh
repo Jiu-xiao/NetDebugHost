@@ -2,22 +2,24 @@
 set -e
 
 APP_NAME="NetDebugHost"
+VERSION="${VERSION:-1.0.0}"
+ARCH="${ARCH:-amd64}"
 SERVICE_NAME="netdebughost"
-VERSION="1.0.0"
-ARCH="amd64"
-DEB_DIR="${APP_NAME}_${VERSION}"
+DEB_DIR="${APP_NAME}_${VERSION}_${ARCH}"
 
-# 清理旧目录
+echo "[*] Packaging $APP_NAME version $VERSION for $ARCH..."
+
+# 1. 清理并创建目录结构
 rm -rf "$DEB_DIR"
 mkdir -p "$DEB_DIR/usr/bin"
 mkdir -p "$DEB_DIR/lib/systemd/system"
 mkdir -p "$DEB_DIR/DEBIAN"
 
-# 1. 拷贝可执行文件
+# 2. 拷贝可执行文件
 cp "build/bin/${APP_NAME}" "$DEB_DIR/usr/bin/"
 chmod 755 "$DEB_DIR/usr/bin/${APP_NAME}"
 
-# 2. 控制文件
+# 3. control 文件
 cat >"$DEB_DIR/DEBIAN/control" <<EOF
 Package: ${SERVICE_NAME}
 Version: ${VERSION}
@@ -27,10 +29,10 @@ Architecture: ${ARCH}
 Maintainer: Xiao Jiu <you@example.com>
 Depends: libc6 (>= 2.31), libudev1 (>= 249), libnm0 (>= 1.36.0)
 Description: Lightweight ESP32 network debugging tool using LibXR.
- Auto-starts via systemd on boot.
+ Automatically starts via systemd at boot.
 EOF
 
-# 3. systemd 服务文件
+# 4. systemd 服务文件
 cat >"$DEB_DIR/lib/systemd/system/${SERVICE_NAME}.service" <<EOF
 [Unit]
 Description=NetDebugHost Network Debug Bridge
@@ -45,7 +47,7 @@ RestartSec=3
 WantedBy=multi-user.target
 EOF
 
-# 4. 安装后执行脚本：注册并启动服务
+# 5. 安装后脚本（注册 systemd 服务）
 cat >"$DEB_DIR/DEBIAN/postinst" <<EOF
 #!/bin/bash
 set -e
@@ -56,7 +58,7 @@ echo "${APP_NAME} installed and service started."
 EOF
 chmod +x "$DEB_DIR/DEBIAN/postinst"
 
-# 5. 卸载后执行脚本：关闭并清理服务
+# 6. 卸载后脚本（清理服务）
 cat >"$DEB_DIR/DEBIAN/postrm" <<EOF
 #!/bin/bash
 set -e
@@ -67,5 +69,8 @@ echo "${APP_NAME} service removed."
 EOF
 chmod +x "$DEB_DIR/DEBIAN/postrm"
 
-# 6. 构建 .deb 包
+# 7. 构建 deb 包
 dpkg-deb --build "$DEB_DIR"
+
+# 8. 输出路径
+echo "[+] Package built: ${DEB_DIR}.deb"

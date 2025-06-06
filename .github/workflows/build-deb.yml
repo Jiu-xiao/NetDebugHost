@@ -5,6 +5,9 @@ on:
     branches: [ master ]
   pull_request:
 
+env:
+  VERSION: "1.0.0"  # 可修改为读取 git tag，例如用 release/tag 触发
+
 jobs:
   build-deb:
     runs-on: ubuntu-latest
@@ -20,42 +23,41 @@ jobs:
         with:
           submodules: recursive
 
-      - name: Set up QEMU (for arm64)
-        uses: docker/setup-qemu-action@v3
+      - name: Install build dependencies
+        run: |
+          sudo apt update
+          sudo apt install -y \
+            build-essential cmake ninja-build \
+            libudev-dev libnm-dev libwpa-client-dev \
+            python3-pip \
+            gcc-aarch64-linux-gnu g++-aarch64-linux-gnu
 
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+      - name: Install xrobot and run xrobot_setup
+        run: |
+          pip install --upgrade pip
+          pip install xrobot
+          xrobot_setup
 
-      - name: Build in XRobot Docker
-        uses: addnab/docker-run-action@v3
-        with:
-          image: ghcr.io/xrobot-org/docker-image-linux:main
-          options: |
-            --privileged
-            --platform linux/${{ matrix.arch }}
-            -v ${{ github.workspace }}:/workspace
-            -w /workspace
-          run: |
-            set -e
+      - name: Configure and build project
+        run: |
+          mkdir -p build
+          cd build
+          if [ "${{ matrix.arch }}" = "arm64" ]; then
+            cmake .. -GNinja \
+              -DCMAKE_SYSTEM_PROCESSOR=aarch64 \
+              -DCMAKE_C_COMPILER=aarch64-linux-gnu-gcc \
+              -DCMAKE_CXX_COMPILER=aarch64-linux-gnu-g++
+          else
+            cmake .. -GNinja
+          fi
+          cmake --build . --target NetDebugHost
 
-            echo "==> 1. 安装 Python 工具链"
-            pip install --upgrade pip
-            pip install xrobot
-
-            echo "==> 2. 运行 xrobot_setup"
-            xrobot_setup
-
-            echo "==> 3. 构建项目 (${ARCH})"
-            mkdir -p build && cd build
-            cmake .. -DCMAKE_BUILD_TYPE=Release
-            make -j$(nproc)
-
-            echo "==> 4. 打包 .deb (${ARCH})"
-            cd ..
-            ARCH=${{ matrix.arch }} ./build_deb.sh
+      - name: Package .deb
+        run: |
+          VERSION=${{ env.VERSION }} ARCH=${{ matrix.arch }} ./build_deb.sh
 
       - name: Upload .deb artifact
         uses: actions/upload-artifact@v4
         with:
           name: netdebughost-${{ matrix.arch }}
-          path: NetDebugHost_1.0.0.deb
+          path: NetDebugHost_*.deb
