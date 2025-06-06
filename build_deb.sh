@@ -3,6 +3,10 @@ set -e
 
 APP_NAME="NetDebugHost"
 VERSION="${VERSION:-1.0.0}"
+# 如果 VERSION 不以数字开头（比如 "master"），则使用 fallback
+if [[ ! "$VERSION" =~ ^[0-9] ]]; then
+    VERSION="0.0.0+$(date +%Y%m%d)-${GITHUB_SHA:-local}"
+fi
 ARCH="${ARCH:-amd64}"
 SERVICE_NAME="netdebughost"
 DEB_DIR="${APP_NAME}_${VERSION}_${ARCH}"
