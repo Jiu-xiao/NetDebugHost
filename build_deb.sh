@@ -48,11 +48,17 @@ After=network.target
 ExecStart=/usr/bin/${APP_NAME}
 Restart=always
 RestartSec=3
-Environment="PATH=/usr/local/bin:/usr/bin:/bin"
+
+# 设置基本运行环境变量
+Environment="PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 Environment="LD_LIBRARY_PATH=/usr/local/lib:/usr/lib"
-StandardInput=tty
-StandardOutput=append:/var/log/netdebughost.log
-StandardError=append:/var/log/netdebughost.log
+
+# 建议使用 journal 管理日志
+StandardOutput=journal
+StandardError=journal
+
+StandardOutput=file:/var/log/netdebughost.log
+StandardError=file:/var/log/netdebughost.log
 
 [Install]
 WantedBy=multi-user.target
