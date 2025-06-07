@@ -27,7 +27,7 @@ int main() {
   XR_LOG_PASS("Found tty: %s", tty.c_str());
 
   LibXR::LinuxUART uart(tty.c_str(), 115200, LibXR::UART::Parity::NO_PARITY, 8,
-                        1, 128, 40960);
+                        1, 128, 0x100000);
 
   LibXR::LinuxWifiClient wifi_client;
 

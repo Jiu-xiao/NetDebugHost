@@ -41,7 +41,7 @@ public:
   };
 
   NetDebugHost(LibXR::HardwareContainer &hw, LibXR::ApplicationManager &app)
-      : uart_topic_("uart_cdc", 40960),
+      : uart_topic_("uart_cdc", 0x100000),
         wifi_config_topic_("wifi_config", sizeof(LibXR::WifiClient::Config)),
         command_topic_("command", sizeof(Command)) {
     uart_ = hw.template FindOrExit<LibXR::UART>({"uart_cdc"});

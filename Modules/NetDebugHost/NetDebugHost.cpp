@@ -82,8 +82,8 @@ void NetDebugHost::SpawnShell()
 }
 void NetDebugHost::ShellReadThread(NetDebugHost *self)
 {
-  uint8_t buf[40960];
-  uint8_t pack_buffer[40960 + LibXR::Topic::PACK_BASE_SIZE];
+  uint8_t buf[512 - LibXR::Topic::PACK_BASE_SIZE];
+  uint8_t pack_buffer[512];
   LibXR::Semaphore sem;
   LibXR::WriteOperation op(sem);
 
@@ -123,11 +123,11 @@ void NetDebugHost::ShellReadThread(NetDebugHost *self)
 
 void NetDebugHost::ShellWriteThread(NetDebugHost *self)
 {
-  uint8_t buf[40960];
+  uint8_t buf[0x100000];
   LibXR::Semaphore sem;
   LibXR::ReadOperation op(sem);
   LibXR::RawData read_buffer(buf);
-  LibXR::Topic::Server server(40960);
+  LibXR::Topic::Server server(0x100000);
   server.Register(self->uart_topic_);
   server.Register(self->wifi_config_topic_);
   server.Register(self->command_topic_);
